@@ -1,0 +1,38 @@
+name: Movers Swing Scanner
+
+on:
+  schedule:
+    - cron: "40 0 * * 1-5"   # 8:40am MYT - Bursa
+    - cron: "0 6 * * 1-5"    # 2:00pm MYT - Bursa
+    - cron: "0 8 * * 1-5"    # 4:00pm MYT - US (prior session)
+    - cron: "0 15 * * 1-5"   # 11:00pm MYT - US (day movement)
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install yfinance requests
+      - name: Determine market
+        id: m
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "market=BOTH" >> $GITHUB_OUTPUT
+          else
+            H=$(date -u +%H)
+            if [ "$H" = "00" ] || [ "$H" = "06" ]; then
+              echo "market=MY" >> $GITHUB_OUTPUT
+            else
+              echo "market=US" >> $GITHUB_OUTPUT
+            fi
+          fi
+      - name: Run scanner
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MARKET: ${{ steps.m.outputs.market }}
+        run: python movers_scanner.py
